@@ -1,4 +1,3 @@
-import React from 'react';
 import { Layout, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
 
 const KpiCards = ({ data }) => {
