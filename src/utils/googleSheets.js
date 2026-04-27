@@ -11,30 +11,43 @@ export const fetchSheetData = async () => {
       Papa.parse(csvText, {
         complete: (results) => {
           const rows = results.data;
-          const formattedData = [];
+          const workItems = [];
+          const summary = [];
+          let sheetDate = '';
           let currentId = 1;
 
-          // Helper to parse blocks
-          // Looking at the CSV structure, agencies are in specific rows
-          // NHAI is around row 17 (0-indexed)
-          // Rows have two blocks side-by-side: NHAI and MCL, then GLADA and Railways, etc.
-          
+          // 1. Extract Date (Cell B5 -> rows[4][1])
+          if (rows[4] && rows[4][1]) {
+            sheetDate = rows[4][1].trim();
+          }
+
+          // 2. Extract Summary Table (Rows 9-15 -> indices 9-15)
+          for (let i = 9; i <= 15; i++) {
+            if (rows[i] && rows[i][1]) {
+              summary.push({
+                name: rows[i][1].trim(),
+                count: parseInt(rows[i][3]) || 0
+              });
+            }
+          }
+
+          // 3. Helper to parse blocks
           const parseBlock = (startRow, startCol, agencyName) => {
-            let rowIdx = startRow + 2; // Skip Agency Name and Headers (Sr no, Work, ...)
+            let rowIdx = startRow + 2;
             while (rowIdx < rows.length && rows[rowIdx] && rows[rowIdx][startCol]) {
               const srNo = rows[rowIdx][startCol];
-              if (isNaN(parseInt(srNo))) break; // End of block if Sr No is not a number
+              if (isNaN(parseInt(srNo))) break;
               
               const work = rows[rowIdx][startCol + 1]?.trim();
               const completion_date = rows[rowIdx][startCol + 2] || '';
               const status = rows[rowIdx][startCol + 3] || 'Pending';
 
               if (work) {
-                formattedData.push({
+                workItems.push({
                   id: currentId++,
                   agency: agencyName,
-                  work: work.replace(/\s+/g, ' '), // Clean up whitespace/newlines
-                  completion_date: completion_date || '2026-12-31', // Fallback date if missing
+                  work: work.replace(/\s+/g, ' '),
+                  completion_date: completion_date || '2026-12-31',
                   status: status || 'Pending'
                 });
               }
@@ -42,7 +55,7 @@ export const fetchSheetData = async () => {
             }
           };
 
-          // Find start of blocks by searching for agency names in the sheet
+          // Find start of blocks
           for (let i = 0; i < rows.length; i++) {
             for (let j = 0; j < rows[i].length; j++) {
               const cell = rows[i][j]?.trim();
@@ -56,7 +69,11 @@ export const fetchSheetData = async () => {
             }
           }
 
-          resolve(formattedData);
+          resolve({
+            date: sheetDate,
+            summary: summary.sort((a, b) => b.count - a.count),
+            workItems: workItems
+          });
         },
         error: (error) => {
           reject(error);
